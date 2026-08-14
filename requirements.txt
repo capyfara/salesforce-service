@@ -1,0 +1,7 @@
+python==3.13.2
+pydantic==2.13.4
+fastapi==0.139.2
+pyjwt==2.13.0
+requests==2.34.2
+cryptography==49.0.0
+minio
