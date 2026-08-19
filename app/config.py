@@ -44,10 +44,9 @@ class SalesforceServiceSettings(BaseSettings):
     SF_MAX_JOB_TIMEOUT_HOURS:int
 
     # # Scan behavior
-    # MAX_CONCURRENT_SCANS:int
-    # SCAN_TIMEOUT_SCANS:int
-    # SCAN_TIMEOUT_HOURS:int
-    # CLEANUP_DAYS:int
+    MAX_CONCURRENT_SCANS:int
+    SCAN_TIMEOUT_HOURS:int
+    CLEANUP_DAYS:int
 
     # # HMAC (Hash based message authentication code)
     # HMAC_ENABLED:bool
@@ -56,11 +55,12 @@ class SalesforceServiceSettings(BaseSettings):
     # HMAC_SIGNATURE_MAX_AGE:int
 
     # # MinIO
-    # MINIO_ENABLED:bool
-    # MINIO_ENDPOINT:str
-    # MINIO_ACCESS_KEY:str
-    # MINIO_SECURE:bool
-    # MINIO_BUCKET:str
+    MINIO_ENABLED:bool
+    MINIO_ENDPOINT:str
+    MINIO_ACCESS_KEY:str
+    MINIO_SECRET_KEY:str
+    MINIO_SECURE:bool
+    MINIO_BUCKET:str
 
     # # Kafka
     # KAFKA_BOOTSTRAP_SERVERS:str

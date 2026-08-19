@@ -32,7 +32,7 @@ def start_scan(bulk_client, scan_store, scan_id: str, org_id: str, objects: list
     scan_store.create(scan)
     return scan
 
-def run_scan_background(bulk_client, scan_store, scan_id: str):
+def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
     """Poll each job to completion, download results"""
     # Run as background task NOT awaited in task handler
 
@@ -50,7 +50,19 @@ def run_scan_background(bulk_client, scan_store, scan_id: str):
             if result.state == "JobComplete":
                 for page in bulk_client.iter_results(progress.sf_job_id):
                     progress.pages_downloaded += 1
-                    # TODO: write `page` to MinIO here once storage/minio_client.py exists
+
+                    path = minio_client.upload_records(
+                        records=page,
+                        org_id=scan.org_id,
+                        scan_id=scan.scan_id,
+                        object_name=obj_name,
+                        page_num=progress.pages_downloaded,
+                    )
+                    if progress.minio_path is None:
+                        progress.minio_path = []
+                    if path:
+                        progress.minio_path.append(path)
+
                 bulk_client.delete_job(progress.sf_job_id)
             else:
                 progress.error = result.error_message

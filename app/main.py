@@ -10,6 +10,7 @@ from config import SalesforceServiceSettings, validate_settings
 from auth.salesforce_auth import SalesforceTokenManager
 from storage.scan_store import InMemoryScanStore
 from clients.bulk_api_client import SalesforceBulkAPIClient
+from storage.minio_client import MinioStorageClient
 
 from routers import health, objects, scan, status
 
@@ -42,10 +43,17 @@ async def lifespan(app: FastAPI):
         settings.SF_CONSUMER_KEY, 
         private_key,
         settings.SF_USERNAME,
-        settings.SF_LOGIN_URL
+        settings.SF_LOGIN_URL,
     )
     app.state.bulk_client = SalesforceBulkAPIClient(token_manager)
     app.state.scan_store = InMemoryScanStore()
+    app.state.minio_client = MinioStorageClient(
+        endpoint=settings.MINIO_ENDPOINT,
+        access_key=settings.MINIO_ACCESS_KEY,
+        secret_key=settings.MINIO_SECRET_KEY,
+        secure=settings.MINIO_SECURE,
+        bucket=settings.MINIO_BUCKET,
+    )
     logger.info("Startup validation passed, Salesforce token manager initialized")
 
 

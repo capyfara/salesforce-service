@@ -17,6 +17,7 @@ class ScanStartRequest(BaseModel):
 def start_scan(req: ScanStartRequest, request : Request, background_tasks: BackgroundTasks):
     bulk_client = request.app.state.bulk_client
     scan_store = request.app.state.scan_store
+    minio_client = request.app.state.minio_client
     last_modified_after = (req.filters or {}).get("last_modified_after")
 
     try:
@@ -34,7 +35,7 @@ def start_scan(req: ScanStartRequest, request : Request, background_tasks: Backg
         raise HTTPException(status_code=500, detail=str(e))
     
     background_tasks.add_task(
-        extraction_service.run_scan_background, bulk_client, scan_store, req.scan_id
+        extraction_service.run_scan_background, bulk_client, scan_store, req.scan_id, minio_client
     )
     
     return {
