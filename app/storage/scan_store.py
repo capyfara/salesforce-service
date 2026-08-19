@@ -14,3 +14,9 @@ class InMemoryScanStore:
     
     def update(self, scan: ScanState) -> None:
         self._scans[scan.scan_id] = scan
+    
+    def list_all(self):
+        return list(self._scans.values())
+    
+    def delete(self, scan_id: str) -> None:
+        self._scans.pop(scan_id, None)

@@ -12,7 +12,7 @@ from storage.scan_store import InMemoryScanStore
 from clients.bulk_api_client import SalesforceBulkAPIClient
 from storage.minio_client import MinioStorageClient
 
-from routers import health, objects, scan, status
+from routers import health, objects, scan, status, list, remove, statistics
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,19 @@ async def lifespan(app: FastAPI):
     # (place any shutdown/cleanup logic here later)
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(health.router)
-app.include_router(objects.router)
-app.include_router(scan.router)
-app.include_router(status.router)
+app.include_router(health.router) # /api/health
+# /api/key/verify
+app.include_router(scan.router) # /api/scan/start
+app.include_router(list.router) # /api/scan/list
+app.include_router(status.router) # /api/scan/{id}/status
+# /api/scan/{id}/cancel
+# /api/scan/{id}/resume
+app.include_router(remove.router) # /api/scan/{id}/remove
+app.include_router(statistics.router) # /api/statistics
+# /api/maintenance/cleanup
+app.include_router(objects.router) # /api/objects
+# /api/batch/info
+
+
+
+

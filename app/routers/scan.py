@@ -1,3 +1,5 @@
+'''Start a Salesforce extraction scan'''
+
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
 from clients.bulk_api_client import SalesforceBulkAPIClient

@@ -1,3 +1,5 @@
+'''List supported Salesforce objects'''
+
 from fastapi import APIRouter
 from models.objects import SUPPORTED_OBJECTS
 

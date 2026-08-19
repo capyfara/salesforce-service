@@ -17,7 +17,7 @@ class ObjectProgress(BaseModel):
     records_processed: int = 0
     records_failed: int = 0
     pages_downloaded: int = 0
-    minio_path: str | None = None
+    minio_path: list[str] | None = None
     error: str | None = None
 
 class ScanState(BaseModel):

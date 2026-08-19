@@ -16,6 +16,9 @@ class MinioStorageClient:
         if not self._client.bucket_exists(self._bucket):
             self._client.make_bucket(self._bucket)
             logger.info(f"Created MinIO bucket:  {self._bucket}")
+
+    def check_bucket(self):
+        return self._client.bucket_exists(self._bucket)
     
     def upload_records(self, records: list[dict], org_id:str, scan_id:str, object_name: str, page_num: int) -> str:
         """Converts a page of records to Parquet and uploads. Returns the s3:// path."""
