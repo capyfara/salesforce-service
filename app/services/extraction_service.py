@@ -1,6 +1,6 @@
-# Orchestrates bulk job lifecycle
-
 """
+Orchestrates bulk job lifecycle
+
 1. Take scan request
 2. Build a SOQL query per object
 3. Create a bulk api job per object
@@ -34,18 +34,30 @@ def start_scan(bulk_client, scan_store, scan_id: str, org_id: str, objects: list
 
 def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
     """Poll each job to completion, download results"""
-    # Run as background task NOT awaited in task handler
 
     scan = scan_store.get(scan_id)
     if not scan:
         return
     
     for obj_name, progress in scan.progress.items():
+        with scan_store.lock(scan_id):
+            current = scan_store.get(scan_id)
+            if current is None or current.status == ScanStatus.CANCELLED:
+                return # If scan is cancelled, stop polling
+            
         try:
+            # ACTUAL RESULT FROM SALESFORCE
             result = bulk_client.poll_until_complete(progress.sf_job_id)
-            progress.state = result.state
-            progress.records_processed = result.records_processed
-            progress.records_failed = result.records_failed
+
+            # Recheck after polling 
+            with scan_store.lock(scan_id):
+                scan = scan_store.get(scan_id)
+                if scan.status == ScanStatus.CANCELLED:
+                    return
+                progress = scan.progress[obj_name]
+                progress.state = result.state
+                progress.records_processed = result.records_processed
+                progress.records_failed = result.records_failed
 
             if result.state == "JobComplete":
                 for page in bulk_client.iter_results(progress.sf_job_id):
@@ -67,12 +79,20 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
             else:
                 progress.error = result.error_message
         except Exception as e:
-            progress.state = "Failed"
-            progress.error = str(e)
-        
-        scan.updated_at = datetime.now(timezone.utc)
-        scan_store.update(scan)
+            with scan_store.lock(scan_id):
+                scan = scan_store.get(scan_id)
+                if scan.status != ScanStatus.CANCELLED:
+                    progress = scan.progress[obj_name]
+                    progress.state = "Failed"
+                    progress.error = str(e)
 
-    all_states = [p.state for p in scan.progress.values()]
-    scan.status = ScanStatus.COMPLETE if all (s == "JobComplete" for s in all_states) else ScanStatus.FAILED
-    scan_store.update(scan)
+        with scan_store.lock(scan_id):
+            scan = scan_store.get(scan_id)
+            if scan.status != ScanStatus.CANCELLED:
+                all_states = [p.state for p in scan.progress.values()]
+                scan.status = ScanStatus.COMPLETE if all(s == "JobComplete" for s in all_states) else ScanStatus.FAILED
+                scan_store.update(scan)
+                scan.updated_at = datetime.now(timezone.utc)
+                scan_store.update(scan)
+                
+    

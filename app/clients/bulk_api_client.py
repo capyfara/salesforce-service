@@ -130,6 +130,18 @@ class SalesforceBulkAPIClient:
         except Exception as e:
             logger.warning(f"Failed to delete job {job_id}: {e}")
 
+    def abort_job(self, job_id: str) -> None:
+        """Aborts a query job via PATCH request for JobComplete and InProgress states."""
+        url = f"{self._base_url()}{JOBS_BASE}/{job_id}"
+        resp = requests.patch(
+            url,
+            json = {"state": "Aborted"},
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        resp.raise_for_status()
+        logger.info(f"Aborted Bulk API job: {job_id}")
+
     '''Get objects'''
     def get_objects(self):
         url = f"{self._base_url()}services/data/v67.0/objects/"
@@ -138,3 +150,11 @@ class SalesforceBulkAPIClient:
         print("Response:", resp.text)
 
         return resp.json()
+    
+    '''Using for debug'''
+    def get_job_info(self, job_id: str) -> str:
+        url = f"{self._base_url()}{JOBS_BASE}/{job_id}"
+        resp = requests.get(url, headers=self._headers(), timeout=self._timeout)
+        resp.raise_for_status()
+        return resp.json()
+     

@@ -9,7 +9,7 @@ class ScanStatus(str, Enum):
     IN_PROGRESS = "in progress"
     COMPLETE = "complete"
     FAILED = "failed"
-    ABORTED = "aborted"
+    CANCELLED = "cancelled"
 
 class ObjectProgress(BaseModel):
     sf_job_id: str | None = None
