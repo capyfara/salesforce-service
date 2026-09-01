@@ -169,8 +169,8 @@ def cancel_scan(request: Request, scan_id: str):
     if jobs_failed_to_abort:
         message += f" {len(jobs_failed_to_abort)} job(s) failed to abort and may still be running."
 
-    success = len(jobs_failed_to_abort) == 0 and len(jobs_aborted) > 0, # gonna count at least one aborted job as success
-    status = "cancelled" if success == True else "failed"
+    success = bool(len(jobs_aborted) > 0) # fail if failed to abort? or if there were exceptions ?
+    status = "cancelled" if success == True else "failed" # 
 
     return {
         "success": success,
@@ -182,6 +182,26 @@ def cancel_scan(request: Request, scan_id: str):
         "message": message,
     }
 
+@router.post("/api/scan/{scan_id}/resume")
+def resume_scan(request: Request, scan_id: str, background_tasks: BackgroundTasks):
+    bulk_client = request.app.state.bulk_client
+    scan_store = request.app.state.scan_store
+    minio_client = request.app.state.minio_client
+
+    try: 
+        scan, resumed = extraction_service.resume_scan(bulk_client, scan_store, scan_id)
+    except ValueError as e:
+        return {"success": False, "message": str(e)}, 409
+    
+    background_tasks.add_task(
+        extraction_service.run_scan_background, bulk_client, scan_store, scan_id, minio_client
+    )
+    return {
+        "success": True,
+        "scan_id": scan_id,
+        "status": "resumed",
+        "objects_resumed": resumed,
+    }, 202
 
 '''Remove a scan record'''
 @router.delete("/api/scan/{scan_id}/remove")

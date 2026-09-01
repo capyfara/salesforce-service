@@ -1,7 +1,8 @@
-# Scan state model
+ # Scan state model
 
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Optional
 from pydantic import BaseModel
 
 class ScanStatus(str, Enum):
@@ -17,8 +18,10 @@ class ObjectProgress(BaseModel):
     records_processed: int = 0
     records_failed: int = 0
     pages_downloaded: int = 0
+    last_locator: Optional[str]
     minio_path: list[str] | None = None
     error: str | None = None
+    sf_job_created_at: Optional[str]
 
 class ScanState(BaseModel):
     scan_id: str

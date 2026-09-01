@@ -33,8 +33,6 @@ async def lifespan(app: FastAPI):
         logger.error("=" * 80)
         raise RuntimeError("Configuration validation failed")
     
-    # SET THESE UP USING DEPENDS
-    
     settings = SalesforceServiceSettings() # pyright: ignore[reportCallIssue]
     private_key = Path(settings.SF_PRIVATE_KEY_PEM_PATH).read_text(encoding="utf-8") # Note change later for prod
 
@@ -67,5 +65,3 @@ app.include_router(scan.router) # Scan endpoints
 # /api/maintenance/cleanup
 app.include_router(objects.router) # /api/objects
 # /api/batch/info
-
-

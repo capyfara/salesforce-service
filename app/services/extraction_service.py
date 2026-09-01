@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from models.objects import SUPPORTED_OBJECTS
 from models.scan import ObjectProgress, ScanState, ScanStatus
 
+SF_RESULT_RETENTION_DAYS = 7
+
 def build_soql(object_name: str, last_modified_after: str | None) ->  str:
     obj = next(o for o in SUPPORTED_OBJECTS if o.name == object_name)
     fields = ", ".join(obj.default_fields)
@@ -90,9 +92,52 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
             scan = scan_store.get(scan_id)
             if scan.status != ScanStatus.CANCELLED:
                 all_states = [p.state for p in scan.progress.values()]
-                scan.status = ScanStatus.COMPLETE if all(s == "JobComplete" for s in all_states) else ScanStatus.FAILED
+                if any(s == "Aborted" for s in all_states):
+                    scan.status = ScanStatus.CANCELLED  # shouldn't normally reach here if cancel_scan's lock works, but safe fallback
+                else:
+                    scan.status = ScanStatus.COMPLETE if all(s == "JobComplete" for s in all_states) else ScanStatus.FAILED
                 scan_store.update(scan)
-                scan.updated_at = datetime.now(timezone.utc)
-                scan_store.update(scan)
-                
-    
+
+def resume_scan(bulk_client, scan_store, scan_id: str, last_modified_after: str | None = None) -> ScanState:
+    """
+    Repairs a failed scan. For each object:
+      - JobComplete on Salesforce -> results still exist for 7 days; just retry the download,
+        don't create a new SF job.
+      - Failed / Aborted / stuck -> the SF job is dead, submit a brand new query job.
+    Objects that are already fully persisted (pages downloaded, no error) are left untouched.
+    """
+    with scan_store.lock(scan_id):
+        scan = scan_store.get(scan_id)
+        if scan is None:
+            raise ValueError(f"scan {scan_id} not found")
+        if scan.status not in (ScanStatus.FAILED, ScanStatus.CANCELLED):
+            raise ValueError(f"scan {scan_id} is {scan.status}, nothing to resume")
+
+        resumed_objects = []
+        for obj_name, progress in scan.progress.items():
+            if progress.state == "JobComplete" and not progress.error:
+                # already fully done and persisted
+                continue
+
+            if progress.state == "JobComplete" and progress.error:
+                progress.error = None
+                progress.pages_downloaded = 0
+                progress.minio_path = None
+                # state stays "JobComplete" — run_scan_background will re-download it
+                resumed_objects.append(obj_name)
+                continue
+
+            # Failed / Aborted / stuck-InProgress -> the SF job is dead. Resubmit fresh.
+            soql = build_soql(obj_name, last_modified_after)
+            new_job_id = bulk_client.create_query_job(soql)
+            scan.progress[obj_name] = ObjectProgress(sf_job_id=new_job_id, state="UploadComplete")
+            resumed_objects.append(obj_name)
+
+        if not resumed_objects:
+            raise ValueError(f"scan {scan_id} has nothing eligible to resume")
+
+        scan.status = ScanStatus.IN_PROGRESS
+        scan.updated_at = datetime.now(timezone.utc)
+        scan_store.update(scan)
+
+    return scan, resumed_objects
