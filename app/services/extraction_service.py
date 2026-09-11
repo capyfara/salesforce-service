@@ -10,8 +10,11 @@ Orchestrates bulk job lifecycle
 
 """
 from datetime import datetime, timezone
+
 from models.objects import SUPPORTED_OBJECTS
 from models.scan import ObjectProgress, ScanState, ScanStatus
+
+from config import SalesforceServiceSettings
 
 SF_RESULT_RETENTION_DAYS = 7
 
@@ -23,7 +26,11 @@ def build_soql(object_name: str, last_modified_after: str | None) ->  str:
 
 def start_scan(bulk_client, scan_store, scan_id: str, org_id: str, objects: list[str], last_modified_after: str | None) -> ScanState:
     """Creates Bulk API Jobs for each requested object"""
-    scan = ScanState(scan_id=scan_id, org_id=org_id)
+    scan = ScanState(
+        scan_id=scan_id, 
+        org_id=org_id, 
+        last_modified_after=last_modified_after
+    )
 
     for obj_name in objects:
         soql = build_soql(obj_name, last_modified_after)
@@ -34,7 +41,7 @@ def start_scan(bulk_client, scan_store, scan_id: str, org_id: str, objects: list
     scan_store.create(scan)
     return scan
 
-def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
+def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max_timeout_seconds: int):
     """Poll each job to completion, download results"""
 
     scan = scan_store.get(scan_id)
@@ -42,16 +49,20 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
         return
     
     for obj_name, progress in scan.progress.items():
+        if progress.state == "JobComplete":
+            # already done, don't touch it
+            continue
+
         with scan_store.lock(scan_id):
             current = scan_store.get(scan_id)
             if current is None or current.status == ScanStatus.CANCELLED:
                 return # If scan is cancelled, stop polling
-            
-        try:
-            # ACTUAL RESULT FROM SALESFORCE
-            result = bulk_client.poll_until_complete(progress.sf_job_id)
 
-            # Recheck after polling 
+        # Start polling 
+        try:
+            result = bulk_client.poll_until_complete(progress.sf_job_id, max_timeout_seconds)
+            
+            # Check if scan was cancelled after polling
             with scan_store.lock(scan_id):
                 scan = scan_store.get(scan_id)
                 if scan.status == ScanStatus.CANCELLED:
@@ -61,6 +72,7 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
                 progress.records_processed = result.records_processed
                 progress.records_failed = result.records_failed
 
+            # Check if scan was complete after polling
             if result.state == "JobComplete":
                 for page in bulk_client.iter_results(progress.sf_job_id):
                     progress.pages_downloaded += 1
@@ -97,47 +109,3 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client):
                 else:
                     scan.status = ScanStatus.COMPLETE if all(s == "JobComplete" for s in all_states) else ScanStatus.FAILED
                 scan_store.update(scan)
-
-def resume_scan(bulk_client, scan_store, scan_id: str, last_modified_after: str | None = None) -> ScanState:
-    """
-    Repairs a failed scan. For each object:
-      - JobComplete on Salesforce -> results still exist for 7 days; just retry the download,
-        don't create a new SF job.
-      - Failed / Aborted / stuck -> the SF job is dead, submit a brand new query job.
-    Objects that are already fully persisted (pages downloaded, no error) are left untouched.
-    """
-    with scan_store.lock(scan_id):
-        scan = scan_store.get(scan_id)
-        if scan is None:
-            raise ValueError(f"scan {scan_id} not found")
-        if scan.status not in (ScanStatus.FAILED, ScanStatus.CANCELLED):
-            raise ValueError(f"scan {scan_id} is {scan.status}, nothing to resume")
-
-        resumed_objects = []
-        for obj_name, progress in scan.progress.items():
-            if progress.state == "JobComplete" and not progress.error:
-                # already fully done and persisted
-                continue
-
-            if progress.state == "JobComplete" and progress.error:
-                progress.error = None
-                progress.pages_downloaded = 0
-                progress.minio_path = None
-                # state stays "JobComplete" — run_scan_background will re-download it
-                resumed_objects.append(obj_name)
-                continue
-
-            # Failed / Aborted / stuck-InProgress -> the SF job is dead. Resubmit fresh.
-            soql = build_soql(obj_name, last_modified_after)
-            new_job_id = bulk_client.create_query_job(soql)
-            scan.progress[obj_name] = ObjectProgress(sf_job_id=new_job_id, state="UploadComplete")
-            resumed_objects.append(obj_name)
-
-        if not resumed_objects:
-            raise ValueError(f"scan {scan_id} has nothing eligible to resume")
-
-        scan.status = ScanStatus.IN_PROGRESS
-        scan.updated_at = datetime.now(timezone.utc)
-        scan_store.update(scan)
-
-    return scan, resumed_objects

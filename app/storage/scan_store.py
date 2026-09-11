@@ -6,13 +6,13 @@ from models.scan import ScanState
 class InMemoryScanStore:
     def __init__(self):
         self._scans: dict[str, ScanState] = {}
-        self._locks: dict[str, threading.Lock] = {}
-        self._locks_guard = threading.Lock() # protects _locks dict itself
+        self._locks: dict[str, threading.RLock] = {}
+        self._locks_guard = threading.RLock() # protects _locks dict itself
     
-    def _get_lock(self, scan_id: str) -> threading.Lock:
+    def _get_lock(self, scan_id: str) -> threading.RLock:
         with self._locks_guard:
             if scan_id not in self._locks:
-                self._locks[scan_id] = threading.Lock()
+                self._locks[scan_id] = threading.RLock()
             return self._locks[scan_id]
         
     @contextmanager

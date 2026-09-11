@@ -67,29 +67,45 @@ class SalesforceBulkAPIClient:
         resp.raise_for_status()
         job_id = resp.json()["id"]
         logger.info(f"Created Bulk API query job: {job_id}")
+        print((f"Created Bulk API query job: {job_id}"))
         return job_id
 
-    def poll_until_complete(self, job_id: str) -> BulkJobResult:
-        """Blocks until the job reaches a terminal state. Uses adaptive polling."""
+    def poll_until_complete(self, job_id: str, max_timeout_seconds: int) -> BulkJobResult:
+        """Blocks until the job reaches a terminal state or times out. Uses adaptive polling."""
         url = f"{self._base_url()}{JOBS_BASE}/{job_id}"
         intervals = iter(self.POLL_INTERVALS)
+        start = time.monotonic()
+
         while True:
+            if time.monotonic() - start > max_timeout_seconds:
+                # Give up waiting — abort it and report Failed
+                try: 
+                    self.abort_job(job_id)
+                except Exception as e:
+                    pass
+                return BulkJobResult(
+                    job_id=job_id, 
+                    state="Failed",
+                    records_processed=0, 
+                    records_failed=0,
+                    error_message=f"Timed out after {max_timeout_seconds}s"
+                )
+            
             resp = requests.get(url, headers=self._headers(), timeout=self._timeout)
             resp.raise_for_status()
             data = resp.json()
-            state = data["state"]
 
-            if state in ("JobComplete", "Failed", "Aborted"):
+            if data["state"] in ("JobComplete", "Failed", "Aborted"):
                 return BulkJobResult(
                     job_id=job_id,
-                    state=state,
+                    state=data["state"],
                     records_processed=data.get("numberRecordsProcessed", 0),
                     records_failed=data.get("numberRecordsFailed", 0),
                     error_message=data.get("errorMessage"),
                 )
 
             delay = next(intervals, 120)
-            logger.debug(f"Job {job_id} state={state}, waiting {delay}s")
+            logger.debug(f"Job {job_id} state={data['state']}, waiting {delay}s")
             time.sleep(delay)
 
     def iter_results(self, job_id: str, page_size: int = 50000) -> Iterator[list[dict]]:

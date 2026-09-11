@@ -34,9 +34,9 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("Configuration validation failed")
     
     settings = SalesforceServiceSettings() # pyright: ignore[reportCallIssue]
-    private_key = Path(settings.SF_PRIVATE_KEY_PEM_PATH).read_text(encoding="utf-8") # Note change later for prod
-
     app.state.settings = settings
+
+    private_key = Path(settings.SF_PRIVATE_KEY_PEM_PATH).read_text(encoding="utf-8") # Note change later for prod
     token_manager = app.state.token_manager = SalesforceTokenManager (
         settings.SF_CONSUMER_KEY, 
         private_key,

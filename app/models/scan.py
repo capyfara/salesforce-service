@@ -18,10 +18,8 @@ class ObjectProgress(BaseModel):
     records_processed: int = 0
     records_failed: int = 0
     pages_downloaded: int = 0
-    last_locator: Optional[str]
     minio_path: list[str] | None = None
     error: str | None = None
-    sf_job_created_at: Optional[str]
 
 class ScanState(BaseModel):
     scan_id: str
@@ -30,3 +28,4 @@ class ScanState(BaseModel):
     started_at: datetime = datetime.now(timezone.utc)
     updated_at: datetime = datetime.now(timezone.utc)
     progress: dict[str, ObjectProgress] = {}
+    last_modified_after: str | None = None

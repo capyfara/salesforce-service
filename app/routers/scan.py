@@ -2,8 +2,10 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Query, Request, HTTPException, status
 from pydantic import BaseModel
-from models.scan import ScanStatus
+from models.scan import ObjectProgress, ScanStatus
 from services import extraction_service
+
+from models.scan import ScanState
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -14,25 +16,6 @@ class ScanStartRequest(BaseModel):
      objects: list[str]
      filters: dict | None = None
 
-'''This is a testing endpoint that starts and aborts a scan'''
-@router.post("/api/scan/start-debug")
-def scan_debug(r: Request):
-    bulk_client = r.app.state.bulk_client
-    print("DEBUG: Starting scan in debug mode")
-    soql = extraction_service.build_soql("Opportunity", None)
-    job_id = bulk_client.create_query_job(soql)
-    print(f"DEBUG: Created job: {job_id}")
-
-    try: 
-        bulk_client.abort_job(job_id)
-    except Exception as e:
-        print(f"DEBUG: Error occurred while aborting job: {e}")
-
-    job_info = bulk_client.get_job_info(job_id)
-    print(f"DEBUG: Job info after abort attempt: {job_info}")
-    
-    return {"job_info_after_abort_attempt": job_info}
-
 '''Start a Salesforce extraction scan'''
 @router.post("/api/scan/start", status_code=202)
 def start_scan(req: ScanStartRequest, request : Request, background_tasks: BackgroundTasks):
@@ -40,6 +23,7 @@ def start_scan(req: ScanStartRequest, request : Request, background_tasks: Backg
     scan_store = request.app.state.scan_store
     minio_client = request.app.state.minio_client
     last_modified_after = (req.filters or {}).get("last_modified_after")
+    settings = request.app.state.settings
 
     try:
         scan = extraction_service.start_scan(
@@ -56,7 +40,8 @@ def start_scan(req: ScanStartRequest, request : Request, background_tasks: Backg
         raise HTTPException(status_code=500, detail=str(e))
 
     background_tasks.add_task(
-        extraction_service.run_scan_background, bulk_client, scan_store, req.scan_id, minio_client
+        extraction_service.run_scan_background, bulk_client, scan_store, scan_id, minio_client, 
+        settings.SF_MAX_JOB_TIMEOUT_HOURS * 3600
     )
 
     logger.info(f"Scan details: {scan}")
@@ -128,10 +113,7 @@ def cancel_scan(request: Request, scan_id: str):
         if progress.state in ("JobComplete"):
             jobs_already_complete.append(progress.sf_job_id)
             continue
-        if progress.state in ("Failed"):
-            continue
-        if progress.state in ("Aborted"):
-            jobs_aborted.append(progress.sf_job_id)
+        if progress.state in ("Failed", "Aborted"):
             continue
 
         try:
@@ -155,7 +137,6 @@ def cancel_scan(request: Request, scan_id: str):
         scan.status = ScanStatus.CANCELLED
     scan.updated_at = datetime.now(timezone.utc)
     scan_store._scans[scan_id] = scan # raw write, still inside the lock
-    # scan_store.update(scan)
 
     complete_names = [
         name for name, progress in scan.progress.items()
@@ -182,26 +163,60 @@ def cancel_scan(request: Request, scan_id: str):
         "message": message,
     }
 
+'''Resume a failed scan by re-running extraction for incomplete objects only'''
 @router.post("/api/scan/{scan_id}/resume")
 def resume_scan(request: Request, scan_id: str, background_tasks: BackgroundTasks):
     bulk_client = request.app.state.bulk_client
     scan_store = request.app.state.scan_store
     minio_client = request.app.state.minio_client
+    settings = request.app.state.settings
 
-    try: 
-        scan, resumed = extraction_service.resume_scan(bulk_client, scan_store, scan_id)
-    except ValueError as e:
-        return {"success": False, "message": str(e)}, 409
-    
-    background_tasks.add_task(
-        extraction_service.run_scan_background, bulk_client, scan_store, scan_id, minio_client
-    )
+    with scan_store.lock(scan_id):
+        scan = scan_store.get(scan_id)
+        if not scan:
+            raise HTTPException(status_code=404, detail="Scan not found")
+        
+        if scan.status not in (ScanStatus.FAILED):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Only failed scans can be resumed (current status: {scan.status})"
+            )
+        
+        incomplete = [
+            name for name, p in scan.progress.items()
+            if p.state not in ("JobComplete", "Aborted")
+        ]
+
+        if not incomplete:
+            raise HTTPException(
+                status_code=400,
+                detail= "No incomplete objects to resume"
+            )
+        
+        resumed = []
+        for obj_name in incomplete:
+            soql = extraction_service.build_soql(obj_name, scan.last_modified_after)
+            new_job_id = bulk_client.create_query_job(soql)
+            scan.progress[obj_name] = ObjectProgress(sf_job_id=new_job_id, state="UploadComplete")
+            resumed.append(obj_name)
+        
+        scan.status = ScanStatus.IN_PROGRESS
+        scan.updated_at = datetime.now(timezone.utc)
+        scan_store._scans[scan_id] = scan
+        scan_store.update(scan) # Status should be IN PROGRESS by now
+
+        background_tasks.add_task(
+            extraction_service.run_scan_background, bulk_client, scan_store, scan_id, minio_client, 
+            settings.SF_MAX_JOB_TIMEOUT_HOURS * 3600
+        )
+
     return {
         "success": True,
         "scan_id": scan_id,
-        "status": "resumed",
-        "objects_resumed": resumed,
-    }, 202
+        "status": scan_store.get(scan_id).status,
+        "resumed_objects": resumed,
+        "message": f"Re-created jobs for {len(resumed)} incomplete object(s): {', '.join(resumed)}",
+    }
 
 '''Remove a scan record'''
 @router.delete("/api/scan/{scan_id}/remove")
