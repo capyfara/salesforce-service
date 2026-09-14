@@ -61,13 +61,10 @@ class SalesforceBulkAPIClient:
             "lineEnding": "LF",
         }
         resp = requests.post(url, json=payload, headers=self._headers(), timeout=self._timeout)
-        print("Status:", resp.status_code)
-        print("Response:", resp.text)
-
         resp.raise_for_status()
         job_id = resp.json()["id"]
+
         logger.info(f"Created Bulk API query job: {job_id}")
-        print((f"Created Bulk API query job: {job_id}"))
         return job_id
 
     def poll_until_complete(self, job_id: str, max_timeout_seconds: int) -> BulkJobResult:

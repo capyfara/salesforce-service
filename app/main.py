@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(health.router) # /api/health
 # /api/key/verify
-app.include_router(scan.router) # Scan endpoints
+app.include_router(scan.router) # /api/scan/* endpoints
 # /api/maintenance/cleanup
 app.include_router(objects.router) # /api/objects
 # /api/batch/info

@@ -32,7 +32,7 @@ class MinioStorageClient:
         buffer.seek(0)
 
         # Matches the path shape shown in Section 5.3's minio_path field
-        object_key = f"{org_id}/{scan_id}/{object_name.lower()}/page-{page_num:04d}.parquet"
+        object_key = f"{org_id}/{scan_id}/{object_name.lower()}/page_{page_num:04d}.parquet"
 
         self._client.put_object(
             bucket_name=self._bucket,

@@ -4,7 +4,7 @@ Orchestrates bulk job lifecycle
 1. Take scan request
 2. Build a SOQL query per object
 3. Create a bulk api job per object
-4. Track per-object state somewhere
+4. Track per-object state in ScanState
 5. Do the actual polling and downloading in the background
 6. Update state as each other's object progresses/completes/fails
 
@@ -15,6 +15,8 @@ from models.objects import SUPPORTED_OBJECTS
 from models.scan import ObjectProgress, ScanState, ScanStatus
 
 from config import SalesforceServiceSettings
+
+from services.deduplication_service import RecordDeduplicator
 
 SF_RESULT_RETENTION_DAYS = 7
 
@@ -72,13 +74,15 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                 progress.records_processed = result.records_processed
                 progress.records_failed = result.records_failed
 
-            # Check if scan was complete after polling
+            # Check if scan was complete during/after polling
             if result.state == "JobComplete":
+                deduplicator = RecordDeduplicator(id_field="Id")
                 for page in bulk_client.iter_results(progress.sf_job_id):
+                    deduped_page = deduplicator.deduplicate(page)
                     progress.pages_downloaded += 1
 
                     path = minio_client.upload_records(
-                        records=page,
+                        records=deduped_page,
                         org_id=scan.org_id,
                         scan_id=scan.scan_id,
                         object_name=obj_name,
