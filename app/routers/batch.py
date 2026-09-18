@@ -1,10 +1,11 @@
 '''Salesforce org and API quota info'''
 
 import logging
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from models.scan import ScanStatus
+from auth.hmac_auth  import verify_hmac
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_hmac)])
 logger = logging.getLogger(__name__)
 
 MAX_CONCURRENT_JOBS = 100  # Salesforce Bulk API hard limit
