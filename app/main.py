@@ -13,7 +13,7 @@ from clients.bulk_api_client import SalesforceBulkAPIClient
 from storage.minio_client import MinioStorageClient
 from clients.core_service_client import CoreServiceClient
 
-from routers import health, objects, scan
+from routers import health, objects, scan, verify, statistics
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +72,9 @@ async def capture_raw_body(request: Request, call_next):
     return response
 
 app.include_router(health.router) # /api/health
-# /api/key/verify
+app.include_router(verify.router) # /api/key/verify
 app.include_router(scan.router) # /api/scan/* endpoints
+app.include_router(statistics.router) # /api/statistics
 # /api/maintenance/cleanup
 app.include_router(objects.router) # /api/objects
 # /api/batch/info
