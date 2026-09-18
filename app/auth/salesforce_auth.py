@@ -63,3 +63,6 @@ class SalesforceTokenManager:
         self._access_token = data["access_token"]
         self._instance_url = data["instance_url"]
         self._expires_at = now + 7200  # tokens last ~2 hours
+    
+    def seconds_until_expiry(self) -> int:
+        return max(0, int(self._expires_at - time.time()))

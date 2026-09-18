@@ -13,7 +13,7 @@ from clients.bulk_api_client import SalesforceBulkAPIClient
 from storage.minio_client import MinioStorageClient
 from clients.core_service_client import CoreServiceClient
 
-from routers import health, objects, scan, verify, statistics
+from routers import health, objects, scan, verify, statistics, batch
 
 logger = logging.getLogger(__name__)
 
@@ -77,4 +77,4 @@ app.include_router(scan.router) # /api/scan/* endpoints
 app.include_router(statistics.router) # /api/statistics
 # /api/maintenance/cleanup
 app.include_router(objects.router) # /api/objects
-# /api/batch/info
+app.include_router(batch.router) # /api/batch/info

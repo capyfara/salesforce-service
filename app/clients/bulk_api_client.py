@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 API_VERSION = "v59.0"
 JOBS_BASE = f"/services/data/{API_VERSION}/jobs/query"
+LIMITS_PATH = f"/services/data/{API_VERSION}/limits"
 
 
 @dataclass
@@ -155,6 +156,7 @@ class SalesforceBulkAPIClient:
         resp.raise_for_status()
         logger.info(f"Aborted Bulk API job: {job_id}")
 
+
     '''Get objects'''
     def get_objects(self):
         url = f"{self._base_url()}services/data/v67.0/objects/"
@@ -164,10 +166,41 @@ class SalesforceBulkAPIClient:
 
         return resp.json()
     
+
     '''Using for debug'''
     def get_job_info(self, job_id: str) -> str:
         url = f"{self._base_url()}{JOBS_BASE}/{job_id}"
         resp = requests.get(url, headers=self._headers(), timeout=self._timeout)
         resp.raise_for_status()
         return resp.json()
-     
+    
+
+    def get_org_limits(self) -> dict:
+        """Calls Salesforce's Limits API for API quota + bulk job usage."""
+        url = f"{self._base_url()}{LIMITS_PATH}"
+        resp = requests.get(url, headers=self._headers(), timeout=self._timeout)
+        resp.raise_for_status()
+        return resp.json()
+    
+    def get_org_info(self) -> dict:
+        """
+        Fetches basic org metadata. Salesforce doesn't expose this in one
+        clean REST call, so query the Organization object via SOQL.
+        """
+        query_url = f"{self._base_url()}/services/data/{API_VERSION}/query"
+        soql = "SELECT Id, Name, InstanceName, IsSandbox FROM Organization LIMIT 1"
+        resp = requests.get(
+            query_url,
+            params={"q": soql},
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        resp.raise_for_status()
+        record = resp.json()["records"][0]
+        return {
+            "id": record["Id"],
+            "name": record["Name"],
+            "instance_url": self._base_url(),
+            "api_version": API_VERSION.lstrip("v"),
+            "sandbox": record["IsSandbox"],
+        }
