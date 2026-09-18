@@ -77,8 +77,8 @@ class SalesforceServiceSettings(BaseSettings):
     # CLICKHOUSE_DATABASE: str
     
     # # Core Service
-    # ALLOWED_ORIGINS: str
-    # CORE_URL: str
+    ALLOWED_ORIGINS: str
+    CORE_SERVICE_URL: str
 
     # where to handle vault secret paths? what does it mean -> NOMAD
 

@@ -18,6 +18,8 @@ from config import SalesforceServiceSettings
 
 from services.deduplication_service import RecordDeduplicator
 
+from fastapi import HTTPException
+
 SF_RESULT_RETENTION_DAYS = 7
 
 def build_soql(object_name: str, last_modified_after: str | None) ->  str:
@@ -43,7 +45,7 @@ def start_scan(bulk_client, scan_store, scan_id: str, org_id: str, objects: list
     scan_store.create(scan)
     return scan
 
-def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max_timeout_seconds: int):
+def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max_timeout_seconds: int, core_service_client):
     """Poll each job to completion, download results"""
 
     scan = scan_store.get(scan_id)
@@ -115,3 +117,12 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                 else:
                     scan.status = ScanStatus.COMPLETE if all(s == "JobComplete" for s in all_states) else ScanStatus.FAILED
                 scan_store.update(scan)
+
+                # Report scan outcome to Core Service Client
+                # COMMENTED OUT AS DEV ENVIRONMENT DOES NOT HAVE CORE SERVICE AVAILABLE
+                # try:
+                #     core_service_client.report_scan_status(scan_id, scan.status, deduped_page)
+                #     pass
+                # except Exception as e:
+                #     print(f"Error occurred while reporting scan status: {e}")
+                #     HTTPException(status_code=500, detail="Error occurred while reporting scan status to Core Service Client")
