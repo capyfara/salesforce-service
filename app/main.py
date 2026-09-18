@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from config import SalesforceServiceSettings, validate_settings
 from auth.salesforce_auth import SalesforceTokenManager
@@ -59,6 +59,13 @@ async def lifespan(app: FastAPI):
     # (place any shutdown/cleanup logic here later)
 
 app = FastAPI(lifespan=lifespan)
+
+@app.middleware("http")
+async def capture_raw_body(request: Request, call_next):
+    request.state.raw_body = await request.body()
+    response = await call_next(request)
+    return response
+
 app.include_router(health.router) # /api/health
 # /api/key/verify
 app.include_router(scan.router) # /api/scan/* endpoints

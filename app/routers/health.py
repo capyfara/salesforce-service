@@ -1,15 +1,14 @@
 import logging
-from fastapi import APIRouter, Depends, Request
-from dependencies import get_token_manager
+from fastapi import APIRouter, Request
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/api/health")
-async def health_check(request: Request,token_manager = Depends(get_token_manager)):
+async def health_check(request: Request):
     # Check if salesforce is connected
     try: 
-        token= token_manager.get_token()
+        token= request.app.state.token_manager.get_token()
         salesforce_connected = bool(token)
         minio_connected = bool(request.app.state.minio_client.check_bucket())
     except Exception as e:

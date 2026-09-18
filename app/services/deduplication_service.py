@@ -15,7 +15,10 @@ class RecordDeduplicator:
         unique_records = []
         for record in records:
             record_id = record.get(self._id_field)
-            if record_id not in self._seen_ids or record_id is None:
+            if record_id is None:
+                unique_records.append(record)
+            elif record_id not in self._seen_ids:
                 self._seen_ids.add(record_id)
                 unique_records.append(record)
+            
         return unique_records

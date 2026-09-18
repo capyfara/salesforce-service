@@ -1,13 +1,14 @@
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, BackgroundTasks, Query, Request, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Query, Request, HTTPException, Depends
 from pydantic import BaseModel
 from models.scan import ObjectProgress, ScanStatus
 from services import extraction_service
 
 from models.scan import ScanState
+from auth.hmac_auth import verify_hmac
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_hmac)])
 logger = logging.getLogger(__name__)
 
 class ScanStartRequest(BaseModel):

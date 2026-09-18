@@ -92,7 +92,8 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                         progress.minio_path = []
                     if path:
                         progress.minio_path.append(path)
-
+                
+                # Delete SF Job
                 bulk_client.delete_job(progress.sf_job_id)
             else:
                 progress.error = result.error_message
@@ -103,7 +104,8 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                     progress = scan.progress[obj_name]
                     progress.state = "Failed"
                     progress.error = str(e)
-
+        
+        # Update scan status once all jobs reach terminal state
         with scan_store.lock(scan_id):
             scan = scan_store.get(scan_id)
             if scan.status != ScanStatus.CANCELLED:

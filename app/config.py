@@ -48,11 +48,11 @@ class SalesforceServiceSettings(BaseSettings):
     SCAN_TIMEOUT_HOURS:int
     CLEANUP_DAYS:int
 
-    # # HMAC (Hash based message authentication code)
-    # HMAC_ENABLED:bool
-    # HMAC_SECRET_KEY_CORE:str
-    # HMAC_SECRET_KEY_ENGINEER:str
-    # HMAC_SIGNATURE_MAX_AGE:int
+    # # HMAC
+    HMAC_ENABLED:bool
+    HMAC_SECRET_KEY_CORE:str
+    HMAC_SECRET_KEY_ENGINEER:str
+    HMAC_SIGNATURE_MAX_AGE:int
 
     # # MinIO
     MINIO_ENABLED:bool
@@ -78,9 +78,9 @@ class SalesforceServiceSettings(BaseSettings):
     
     # # Core Service
     # ALLOWED_ORIGINS: str
-    # BD_CORE_URL: str
+    # CORE_URL: str
 
-    # where to handle vault secret paths? what does it mean
+    # where to handle vault secret paths? what does it mean -> NOMAD
 
 # This function returns configuration errors
 # Format is a dictionary {field, details{"error", "fix"}}

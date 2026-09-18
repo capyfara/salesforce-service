@@ -29,7 +29,5 @@ SUPPORTED_OBJECTS: list[SupportedObject] = [
         default_fields = ["Id", "Name", "AccountId", "OwnerId", "StageName", "Amount", "CloseDate", "CreatedDate", "LastModifiedDate"],
         supports_incremental = True
     )
-    # Add Activity, Lead, User, CampaignMember per Section 3.3 —
-    # confirm exact default_fields with your manager if not specified,
-    # since the doc doesn't give explicit field lists for these 4.
+    # Add Activity, Lead, User, CampaignMember per Section 3.3 
 ]

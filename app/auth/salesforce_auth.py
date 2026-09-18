@@ -42,7 +42,6 @@ class SalesforceTokenManager:
             timeout=30,
         )
 
-        # Debugging: Log the response content if request fails
         resp = requests.post(
             f"{self._login_url}/services/oauth2/token",
             data={
@@ -51,9 +50,6 @@ class SalesforceTokenManager:
             },
             timeout=30,
         )
-
-        print(resp.status_code)
-        print(resp.text)
 
         resp.raise_for_status()
         
