@@ -9,6 +9,8 @@ Orchestrates bulk job lifecycle
 6. Update state as each other's object progresses/completes/fails
 
 """
+import logging
+
 from datetime import datetime, timezone
 
 from models.objects import SUPPORTED_OBJECTS
@@ -19,6 +21,8 @@ from config import SalesforceServiceSettings
 from services.deduplication_service import RecordDeduplicator
 
 from fastapi import HTTPException
+
+logger = logging.getLogger(__name__)
 
 SF_RESULT_RETENTION_DAYS = 7
 
@@ -75,9 +79,13 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                 progress.state = result.state
                 progress.records_processed = result.records_processed
                 progress.records_failed = result.records_failed
+                scan_store.update(scan)
 
             # Check if scan was complete during/after polling
             if result.state == "JobComplete":
+                
+                logger.info(f"Scan completed for object: {progress}")
+
                 deduplicator = RecordDeduplicator(id_field="Id")
                 for page in bulk_client.iter_results(progress.sf_job_id):
                     deduped_page = deduplicator.deduplicate(page)
@@ -94,35 +102,50 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                         progress.minio_path = []
                     if path:
                         progress.minio_path.append(path)
+                    scan_store.update(scan)
                 
                 # Delete SF Job
                 bulk_client.delete_job(progress.sf_job_id)
             else:
-                progress.error = result.error_message
+                with scan_store.lock(scan_id):
+                    scan = scan_store.get(scan_id)
+                    progress = scan.progress[obj_name]
+                    progress.error = result.error_message
+                    scan_store.update(scan)
+
         except Exception as e:
+            print(f"Error occurred while polling job: {e}")
+
             with scan_store.lock(scan_id):
                 scan = scan_store.get(scan_id)
                 if scan.status != ScanStatus.CANCELLED:
                     progress = scan.progress[obj_name]
                     progress.state = "Failed"
                     progress.error = str(e)
-        
-        # Update scan status once all jobs reach terminal state
-        with scan_store.lock(scan_id):
-            scan = scan_store.get(scan_id)
-            if scan.status != ScanStatus.CANCELLED:
-                all_states = [p.state for p in scan.progress.values()]
-                if any(s == "Aborted" for s in all_states):
-                    scan.status = ScanStatus.CANCELLED  # shouldn't normally reach here if cancel_scan's lock works, but safe fallback
-                else:
-                    scan.status = ScanStatus.COMPLETE if all(s == "JobComplete" for s in all_states) else ScanStatus.FAILED
-                scan_store.update(scan)
+                    scan_store.update(scan)
 
-                # Report scan outcome to Core Service Client
-                # COMMENTED OUT AS DEV ENVIRONMENT DOES NOT HAVE CORE SERVICE AVAILABLE
-                # try:
-                #     core_service_client.report_scan_status(scan_id, scan.status, deduped_page)
-                #     pass
-                # except Exception as e:
-                #     print(f"Error occurred while reporting scan status: {e}")
-                #     HTTPException(status_code=500, detail="Error occurred while reporting scan status to Core Service Client")
+            logger.error(f"Scan failed for object: {progress}")
+        
+
+    # Update scan status once all jobs reach terminal state
+    with scan_store.lock(scan_id):
+        scan = scan_store.get(scan_id)
+        if scan.status != ScanStatus.CANCELLED:
+            all_states = [p.state for p in scan.progress.values()]
+            if any(s == "Aborted" for s in all_states):
+                scan.status = ScanStatus.CANCELLED  # shouldn't normally reach here if cancel_scan's lock works, but safe fallback
+            else:
+                scan.status = ScanStatus.COMPLETE if all(s == "JobComplete" for s in all_states) else ScanStatus.FAILED
+            scan_store.update(scan)
+
+
+            # *COMMENTED OUT AS DEV ENVIRONMENT DOES NOT HAVE CORE SERVICE AVAILABLE*
+
+            # Report scan outcome to Core Service Client
+            
+            # try:
+            #     core_service_client.report_scan_status(scan_id, scan.status, deduped_page)
+            #     pass
+            # except Exception as e:
+            #     print(f"Error occurred while reporting scan status: {e}")
+            #     HTTPException(status_code=500, detail="Error occurred while reporting scan status to Core Service Client")

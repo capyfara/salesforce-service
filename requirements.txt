@@ -7,3 +7,4 @@ minio
 pandas
 pyarrow
 pytest
+psycopg2

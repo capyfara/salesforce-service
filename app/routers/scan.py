@@ -140,7 +140,7 @@ def cancel_scan(request: Request, scan_id: str):
     if (len(jobs_aborted) == len(scan.progress)):
         scan.status = ScanStatus.CANCELLED
     scan.updated_at = datetime.now(timezone.utc)
-    scan_store._scans[scan_id] = scan # raw write, still inside the lock
+    scan_store.update(scan)
 
     complete_names = [
         name for name, progress in scan.progress.items()
@@ -206,7 +206,6 @@ def resume_scan(request: Request, scan_id: str, background_tasks: BackgroundTask
         
         scan.status = ScanStatus.IN_PROGRESS
         scan.updated_at = datetime.now(timezone.utc)
-        scan_store._scans[scan_id] = scan
         scan_store.update(scan) # Status should be IN PROGRESS by now
 
         core_service_client = request.app.state.core_client
