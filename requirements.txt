@@ -1,4 +1,6 @@
+uvicorn[standard]
 pydantic
+pydantic-settings
 fastapi
 pyjwt
 requests
@@ -7,4 +9,4 @@ minio
 pandas
 pyarrow
 pytest
-psycopg2
+psycopg2-binary
