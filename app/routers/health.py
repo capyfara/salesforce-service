@@ -10,11 +10,16 @@ async def health_check(request: Request):
     try: 
         token= request.app.state.token_manager.get_token()
         salesforce_connected = bool(token)
-        minio_connected = bool(request.app.state.minio_client.check_bucket())
     except Exception as e:
         logger.warning(f"Health check:  Salesforce token fetch failed: {e}")
         salesforce_connected = False
-    
+
+    try: 
+        minio_connected = bool(request.app.state.minio_client.check_bucket())
+    except Exception as e:
+        logger.warning(f"Health check:  MinIO bucket check failed: {e}")
+        minio_connected = False
+
     status = "healthy" if salesforce_connected and minio_connected else "degraded"
 
     return {

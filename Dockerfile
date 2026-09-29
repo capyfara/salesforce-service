@@ -6,7 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy in the source code
-COPY . .
+COPY /app .
 
-# What command
-CMD uvicorn main:app --host ${HOST:-0.0.0.0} --port ${PORT:-8000}
+# Run app
+CMD fastapi run  main.py --host ${HOST:-0.0.0.0} --port ${PORT:-8000}

@@ -1,4 +1,58 @@
 services:
+  app:
+    build: .
+    container_name: salesforce-service-app-dev
+    command: fastapi run main.py --host 0.0.0.0 --port 5710
+    ports:
+      - "5710:5710"
+    environment:
+      FASTAPI_ENV: development
+      FASTAPI_DEBUG: "true"
+      SECRET_KEY: dev-secret-change-me-please-32chars
+      PORT: "5710"
+      HOST: "0.0.0.0"
+      ENVIRONMENT: dev
+      LOG_LEVEL: DEBUG
+      LOG_FORMAT: text
+      LOKI_ENABLED: "false"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: salesforce_dev
+      DB_USER: dev_user
+      DB_PASSWORD: dev_pass
+      DB_SCHEMA: public
+      SF_CONSUMER_KEY: ${SF_CONSUMER_KEY}
+      SF_PRIVATE_KEY_PEM_PATH: /run/secrets/sf_private_key.pem
+      SF_USERNAME: ${SF_USERNAME}
+      SF_LOGIN_URL: https://test.salesforce.com
+      SF_API_VERSION: v59.0
+      SF_BULK_PAGE_SIZE: "50000"
+      SF_MAX_JOB_TIMEOUT_HOURS: "2"
+      MAX_CONCURRENT_SCANS: "2"
+      SCAN_TIMEOUT_HOURS: "2"
+      CLEANUP_DAYS: "7"
+      HMAC_ENABLED: "false"
+      HMAC_SECRET_KEY_CORE: dev-core-key
+      HMAC_SECRET_KEY_ENGINEER: dev-engineer-key
+      HMAC_SIGNATURE_MAX_AGE: "300"
+      MINIO_ENABLED: "true"
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
+      MINIO_BUCKET: salesforce-dev
+      CLICKHOUSE_ENABLED: "false"
+      ALLOWED_ORIGINS: "*"
+      CORE_SERVICE_URL: http://localhost:5700
+    volumes:
+      - ./app/secrets/sf_private_key.pem:/run/secrets/sf_private_key.pem:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+ 
   db:
     image: postgres:16-alpine
     container_name: salesforce-service-db-dev
@@ -16,7 +70,7 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-
+ 
   minio:
     image: minio/minio:latest
     container_name: salesforce-service-minio-dev
@@ -25,8 +79,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web console
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - salesforce_dev_miniodata:/data
     healthcheck:
@@ -35,9 +89,7 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-
-  # One-shot job: creates the salesforce-dev bucket on startup.
-  # Nothing else in the stack provisions this bucket automatically.
+ 
   minio-init:
     image: quay.io/minio/mc:latest
     container_name: salesforce-service-minio-init
@@ -50,7 +102,7 @@ services:
       mc mb --ignore-existing local/salesforce-dev
       "
     restart: "no"
-
+ 
 volumes:
   salesforce_dev_pgdata:
   salesforce_dev_miniodata:

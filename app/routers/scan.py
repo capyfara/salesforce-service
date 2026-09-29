@@ -57,7 +57,6 @@ def start_scan(req: ScanStartRequest, request : Request, background_tasks: Backg
             "status": "started",
             "jobs": {name: p.sf_job_id for name, p in scan.progress.items()},
             "message": f"{len(scan.progress)} Bulk API jobs created. Poll /api/scan/{scan.scan_id}/status for progress.",
-            # "debug_info": {name: bulk_client.get_job_info(p.sf_job_id) for name, p in scan.progress.items()}
         }
     
 
