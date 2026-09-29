@@ -27,19 +27,29 @@ def start_scan(req: ScanStartRequest, request : Request, background_tasks: Backg
     settings = request.app.state.settings
 
     try:
-        scan = extraction_service.start_scan(
-            bulk_client, 
-            scan_store, 
-            req.scan_id, 
-            req.org_id, 
-            req.objects, 
-            last_modified_after
-        )
+        objects = extraction_service.resolve_objects(req.objects)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    scan = extraction_service.start_scan(
+        bulk_client, scan_store, req.scan_id, req.org_id, objects, last_modified_after
+    )
+
+    # try:
+        
+    #     scan = extraction_service.start_scan(
+    #         bulk_client, 
+    #         scan_store, 
+    #         req.scan_id, 
+    #         req.org_id, 
+    #         req.objects, 
+    #         last_modified_after
+    #     )
         
     
-    except Exception as e:
-        logger.error(f"Error occurred while starting scan: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # except Exception as e:
+    #     logger.error(f"Error occurred while starting scan: {e}")
+    #     raise HTTPException(status_code=500, detail=str(e))
     
     core_service_client = request.app.state.core_client
 

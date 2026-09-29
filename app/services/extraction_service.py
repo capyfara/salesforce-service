@@ -26,11 +26,36 @@ logger = logging.getLogger(__name__)
 
 SF_RESULT_RETENTION_DAYS = 7
 
+OBJECT_ALIASES = {"Activity": ["Task", "Event"]}
+_BY_NAME = {o.name: o for o in SUPPORTED_OBJECTS}
+
+def resolve_objects(objects: list[str]) -> list[str]:
+    """Expand aliases, dedupe (order-preserving), and validate names."""
+    resolved: list[str] = []
+    for name in objects:
+        for n in OBJECT_ALIASES.get(name, [name]):
+            if n not in _BY_NAME:
+                raise ValueError(f"Unsupported object: {n}")
+            if n not in resolved:
+                resolved.append(n)
+    return resolved
+
+
 def build_soql(object_name: str, last_modified_after: str | None) ->  str:
     obj = next(o for o in SUPPORTED_OBJECTS if o.name == object_name)
+    conditions = []
+    if obj.base_where:
+        conditions.append(obj.base_where)
+    if last_modified_after:
+        conditions.append(f"LastModifiedDate >= {last_modified_after}")
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     fields = ", ".join(obj.default_fields)
-    where_clause = f"WHERE LastModifiedDate >= {last_modified_after}" if last_modified_after else ""
     return obj.soql_template.format(fields=fields, where_clause=where_clause)
+    
+    # fields = ", ".join(obj.default_fields)
+    # where_clause = f"WHERE LastModifiedDate >= {last_modified_after}" if last_modified_after else ""
+    # return obj.soql_template.format(fields=fields, where_clause=where_clause)
 
 def start_scan(bulk_client, scan_store, scan_id: str, org_id: str, objects: list[str], last_modified_after: str | None) -> ScanState:
     """Creates Bulk API Jobs for each requested object"""
