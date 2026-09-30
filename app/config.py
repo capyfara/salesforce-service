@@ -63,12 +63,6 @@ class SalesforceServiceSettings(BaseSettings):
     MINIO_SECURE: bool = False
     MINIO_BUCKET: str
 
-    # # Kafka
-    # KAFKA_BOOTSTRAP_SERVERS:str
-    # KAFKA_CONSUMER_GROUP_ID:str
-    # KAFKA_AUTO_OFFSET_RESET:str
-    # KAFKA_ENABLE_AUTO_COMMIT:bool
-
     # Clickhouse
     CLICKHOUSE_ENABLED: bool = False
     CLICKHOUSE_HOST: str | None = None

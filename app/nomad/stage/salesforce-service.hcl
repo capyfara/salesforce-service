@@ -58,8 +58,8 @@ job "Salesforce-Service-Stage-App" {
 
 APP_VERSION="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.APP_VERSION }}{{ end }}"
 APP_TITLE="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.APP_TITLE }}{{ end }}"
-FLASK_ENV="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.FLASK_ENV }}{{ end }}"
-FLASK_DEBUG="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.FLASK_DEBUG }}{{ end }}"
+FASTAPI_ENV="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.FASTAPI_ENV }}{{ end }}"
+FASTAPI_DEBUG="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.FASTAPI_DEBUG }}{{ end }}"
 SECRET_KEY="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.SECRET_KEY }}{{ end }}"
 PORT="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.PORT }}{{ end }}"
 HOST="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.HOST }}{{ end }}"
@@ -98,11 +98,6 @@ MINIO_ACCESS_KEY="{{ with secret "secrets/data/glynac/salesforce-service-staging
 MINIO_SECRET_KEY="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.MINIO_SECRET_KEY }}{{ end }}"
 MINIO_SECURE="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.MINIO_SECURE }}{{ end }}"
 MINIO_BUCKET="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.MINIO_BUCKET }}{{ end }}"
-
-PII_MASKING_ENABLED="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.PII_MASKING_ENABLED }}{{ end }}"
-PII_SERVICE_URL="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.PII_SERVICE_URL }}{{ end }}"
-PII_HMAC_KEY="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.PII_HMAC_KEY }}{{ end }}"
-PII_SERVICE_ID="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.PII_SERVICE_ID }}{{ end }}"
 
 ALLOWED_ORIGINS="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.ALLOWED_ORIGINS }}{{ end }}"
 CORE_SERVICE_URL="{{ with secret "secrets/data/glynac/salesforce-service-staging" }}{{ .Data.data.CORE_SERVICE_URL }}{{ end }}"
