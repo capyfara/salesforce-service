@@ -10,3 +10,4 @@ pandas
 pyarrow
 pytest
 psycopg2-binary
+clickhouse-connect

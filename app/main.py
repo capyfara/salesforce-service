@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 
+from app.storage.clickhouse_client import ClickHouseClient
 from config import SalesforceServiceSettings, validate_settings
 from auth.salesforce_auth import SalesforceTokenManager
 from storage.scan_store import PostgresScanStore
@@ -62,6 +63,22 @@ async def lifespan(app: FastAPI):
         settings.CORE_SERVICE_URL, 
         settings.HMAC_SECRET_KEY_CORE
     )
+
+    if settings.CLICKHOUSE_ENABLED:
+        s3_base = settings.CLICKHOUSE_S3_ENDPOINT or (
+            f"{'https' if settings.MINIO_SECURE else 'http'}://{settings.MINIO_ENDPOINT}"
+        )
+        ch = ClickHouseClient(
+            settings.CLICKHOUSE_HOST, settings.CLICKHOUSE_PORT,
+            settings.CLICKHOUSE_USER, settings.CLICKHOUSE_PASSWORD,
+            settings.CLICKHOUSE_DATABASE, settings.CLICKHOUSE_SECURE,
+            s3_base, settings.MINIO_BUCKET,
+            settings.MINIO_ACCESS_KEY, settings.MINIO_SECRET_KEY,
+        )
+        ch.ensure_schema()
+        app.state.clickhouse_client = ch
+    else:
+        app.state.clickhouse_client = None
    
     logger.info("Startup validation passed, Salesforce token manager initialized")
 

@@ -20,6 +20,9 @@ class ObjectProgress(BaseModel):
     pages_downloaded: int = 0
     minio_path: list[str] | None = None
     error: str | None = None
+    clickhouse_loaded: bool = False
+    clickhouse_rows: int = 0
+    clickhouse_error: str | None = None
 
 class ScanState(BaseModel):
     scan_id: str
