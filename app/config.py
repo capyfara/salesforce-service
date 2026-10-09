@@ -70,6 +70,8 @@ class SalesforceServiceSettings(BaseSettings):
     CLICKHOUSE_USER: str | None = None
     CLICKHOUSE_PASSWORD: str | None = None
     CLICKHOUSE_DATABASE: str | None = None
+    CLICKHOUSE_S3_ENDPOINT: str | None = None
+    CLICKHOUSE_SECURE: bool = False
     
     # # Core Service
     ALLOWED_ORIGINS: str

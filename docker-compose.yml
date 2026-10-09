@@ -24,7 +24,7 @@ services:
       SF_CONSUMER_KEY: ${SF_CONSUMER_KEY}
       SF_PRIVATE_KEY_PEM_PATH: /run/secrets/sf_private_key.pem
       SF_USERNAME: ${SF_USERNAME}
-      SF_LOGIN_URL: https://test.salesforce.com
+      SF_LOGIN_URL: https://login.salesforce.com
       SF_API_VERSION: v59.0
       SF_BULK_PAGE_SIZE: "50000"
       SF_MAX_JOB_TIMEOUT_HOURS: "2"
@@ -41,7 +41,14 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: "false"
       MINIO_BUCKET: salesforce-dev
-      CLICKHOUSE_ENABLED: "false"
+      CLICKHOUSE_ENABLED: "true"
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_USER: dev_user
+      CLICKHOUSE_PASSWORD: dev_pass
+      CLICKHOUSE_DATABASE: salesforce
+      CLICKHOUSE_SECURE: "false"
+      CLICKHOUSE_S3_ENDPOINT: http://minio:9000
       ALLOWED_ORIGINS: "*"
       CORE_SERVICE_URL: http://localhost:5700
     volumes:
@@ -50,6 +57,8 @@ services:
       db:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
     restart: unless-stopped
  
@@ -102,7 +111,30 @@ services:
       mc mb --ignore-existing local/salesforce-dev
       "
     restart: "no"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: salesforce-service-clickhouse-dev
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_DB: salesforce
+      CLICKHOUSE_USER: dev_user
+      CLICKHOUSE_PASSWORD: dev_pass
+    ports:
+      - "8123:8123"        
+    volumes:
+      - salesforce_dev_chdata:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
  
 volumes:
   salesforce_dev_pgdata:
   salesforce_dev_miniodata:
+  salesforce_dev_chdata:

@@ -36,10 +36,11 @@ def start_scan(req: ScanStartRequest, request : Request, background_tasks: Backg
     )
 
     core_service_client = request.app.state.core_client
+    clickhouse_client = request.app.state.clickhouse_client
 
     background_tasks.add_task(
         extraction_service.run_scan_background, bulk_client, scan_store, req.scan_id, minio_client, 
-        settings.SF_MAX_JOB_TIMEOUT_HOURS * 3600, core_service_client
+        settings.SF_MAX_JOB_TIMEOUT_HOURS * 3600, core_service_client, clickhouse_client
     )
 
     logger.info(f"Scan details: {scan}")
@@ -202,10 +203,11 @@ def resume_scan(request: Request, scan_id: str, background_tasks: BackgroundTask
         scan_store.update(scan) # Status should be IN PROGRESS by now
 
         core_service_client = request.app.state.core_client
+        clickhouse_client = request.app.state.clickhouse_client
 
         background_tasks.add_task(
             extraction_service.run_scan_background, bulk_client, scan_store, scan_id, minio_client, 
-            settings.SF_MAX_JOB_TIMEOUT_HOURS * 3600, core_service_client
+            settings.SF_MAX_JOB_TIMEOUT_HOURS * 3600, core_service_client, clickhouse_client
         )
 
     return {

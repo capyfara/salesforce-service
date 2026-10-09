@@ -99,6 +99,13 @@ MINIO_SECRET_KEY="{{ with secret "secrets/data/glynac/salesforce-service-prod" }
 MINIO_SECURE="{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.MINIO_SECURE }}{{ end }}"
 MINIO_BUCKET="{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.MINIO_BUCKET }}{{ end }}"
 
+CLICKHOUSE_ENABLED:"{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.CLICKHOUSE_ENABLED }}{{ end }}"
+CLICKHOUSE_HOST:"{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.CLICKHOUSE_HOST }}{{ end }}"
+CLICKHOUSE_PORT:"{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.CLICKHOUSE_PORT }}{{ end }}"
+CLICKHOUSE_USER:"{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.CLICKHOUSE_USER }}{{ end }}"
+CLICKHOUSE_PASSWORD:"{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.CLICKHOUSE_PASSWORD }}{{ end }}"
+CLICKHOUSE_DATABASE:"{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.CLICKHOUSE_DATABASE }}{{ end }}"
+
 ALLOWED_ORIGINS="{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.ALLOWED_ORIGINS }}{{ end }}"
 CORE_SERVICE_URL="{{ with secret "secrets/data/glynac/salesforce-service-prod" }}{{ .Data.data.CORE_SERVICE_URL }}{{ end }}"
 

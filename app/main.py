@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 
-from app.storage.clickhouse_client import ClickHouseClient
+from storage.clickhouse_client import ClickHouseClient
 from config import SalesforceServiceSettings, validate_settings
 from auth.salesforce_auth import SalesforceTokenManager
 from storage.scan_store import PostgresScanStore

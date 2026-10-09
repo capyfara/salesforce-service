@@ -1,6 +1,6 @@
 import logging
 import clickhouse_connect
-from storage.clickhouse_schemas import SCHEMAS
+from models.clickhouse_schemas import SCHEMAS
 
 logger = logging.getLogger(__name__)
 
