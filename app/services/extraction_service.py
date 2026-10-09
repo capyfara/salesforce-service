@@ -141,6 +141,18 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                 
                 # Delete SF Job
                 bulk_client.delete_job(progress.sf_job_id)
+
+                if clickhouse_client and progress.minio_path:   # empty -> s3() glob would error
+                    try:
+                        rows = clickhouse_client.load_object(obj_name, scan.org_id, scan.scan_id)
+                        _set_progress(scan_store, scan_id, obj_name,
+                                    clickhouse_loaded=True, clickhouse_rows=rows, clickhouse_error=None)
+                    except Exception as e:
+                        logger.error(f"ClickHouse load failed for {obj_name}: {e}")
+                        _set_progress(scan_store, scan_id, obj_name,
+                                    clickhouse_loaded=False, clickhouse_error=str(e))
+
+                bulk_client.delete_job(progress.sf_job_id)
             else:
                 with scan_store.lock(scan_id):
                     scan = scan_store.get(scan_id)
@@ -160,18 +172,6 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                     scan_store.update(scan)
 
             logger.error(f"Scan failed for object: {progress}")
-
-    if clickhouse_client and progress.minio_path:   # empty -> s3() glob would error
-        try:
-            rows = clickhouse_client.load_object(obj_name, scan.org_id, scan.scan_id)
-            _set_progress(scan_store, scan_id, obj_name,
-                          clickhouse_loaded=True, clickhouse_rows=rows, clickhouse_error=None)
-        except Exception as e:
-            logger.error(f"ClickHouse load failed for {obj_name}: {e}")
-            _set_progress(scan_store, scan_id, obj_name,
-                          clickhouse_loaded=False, clickhouse_error=str(e))
-
-    bulk_client.delete_job(progress.sf_job_id)
         
 
     # Update scan status once all jobs reach terminal state
