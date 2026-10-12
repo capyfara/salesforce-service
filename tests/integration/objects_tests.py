@@ -1,5 +1,5 @@
 """
-Integration tests for GET /api/objects
+Integration tests for GET /api/objects (routers/objects.py).
 
 Beyond checking the HTTP response, these tests act as a contract between the
 objects catalog (models/objects.py) and the extraction service that consumes it.
@@ -16,12 +16,15 @@ from fastapi.testclient import TestClient
 
 from auth.hmac_auth import verify_hmac
 from models.objects import SUPPORTED_OBJECTS, SupportedObject
+from models.clickhouse_schemas import SCHEMAS
 from routers import objects
 import services.extraction_service as extraction_service
 
 CORE_KEY = "core-key-" + "x" * 32
 ENGINEER_KEY = "engineer-key-" + "y" * 32
-EXPECTED_FIELDS = {"name", "label", "soql_template", "default_fields", "supports_incremental"}
+EXPECTED_FIELDS = {
+    "name", "label", "soql_template", "default_fields", "supports_incremental", "base_where",
+}
 
 
 def sign(body="", key=CORE_KEY, key_id="core", timestamp=None):
@@ -94,6 +97,13 @@ def test_each_object_has_exactly_the_documented_fields(supported):
     for obj in supported:
         assert set(obj) == EXPECTED_FIELDS, obj["name"]
 
+def test_every_supported_object_has_a_schema():
+    for o in SUPPORTED_OBJECTS:
+        spec = SCHEMAS[o.name]
+        cols = {n for n, _ in spec.columns}
+        assert set(o.default_fields) <= cols
+        assert {"Id", "LastModifiedDate"} <= cols
+
 
 def test_field_types(supported):
     for obj in supported:
@@ -103,6 +113,24 @@ def test_field_types(supported):
         assert isinstance(obj["default_fields"], list) and obj["default_fields"]
         assert all(isinstance(f, str) for f in obj["default_fields"])
         assert isinstance(obj["supports_incremental"], bool)
+        # optional static filter, ANDed with the incremental filter by build_soql
+        assert obj["base_where"] is None or (
+            isinstance(obj["base_where"], str) and obj["base_where"].strip()
+        ), obj["name"]
+
+
+def test_base_where_is_applied_to_generated_soql(supported):
+    """build_soql must include each object's base_where, with and without the
+    incremental filter, joined by AND."""
+    for obj in supported:
+        if not obj["base_where"]:
+            continue
+        full = extraction_service.build_soql(obj["name"], None)
+        assert f"WHERE {obj['base_where']}" in full, obj["name"]
+
+        inc = extraction_service.build_soql(obj["name"], "2026-04-01T00:00:00Z")
+        assert obj["base_where"] in inc, obj["name"]
+        assert "AND LastModifiedDate >= 2026-04-01T00:00:00Z" in inc, obj["name"]
 
 
 def test_response_matches_catalog(supported):
@@ -119,12 +147,13 @@ def test_objects_only_allows_get(client):
 
 
 def test_route_reads_the_live_catalog(client, monkeypatch):
+    # model_copy keeps this independent of how base_where is declared
     custom = [
-        SupportedObject(
-            name="Lead", label="Leads",
-            soql_template="SELECT {fields} FROM Lead {where_clause}",
-            default_fields=["Id"], supports_incremental=False,
-        )
+        SUPPORTED_OBJECTS[0].model_copy(update={
+            "name": "Lead", "label": "Leads",
+            "soql_template": "SELECT {fields} FROM Lead {where_clause}",
+            "default_fields": ["Id"], "supports_incremental": False,
+        })
     ]
     monkeypatch.setattr(objects, "SUPPORTED_OBJECTS", custom)
 
