@@ -77,20 +77,33 @@ def test_error_entries_have_error_and_fix_keys(env, monkeypatch):
 
 @pytest.mark.parametrize("env_name", ["stage", "prod"])
 def test_debug_forbidden_in_stage_and_prod(env, env_name):
-    env(FASTAPI_ENV=env_name, FASTAPI_DEBUG="true")
-    assert "FASTAPI_DEBUG" in config.validate_settings()
+    env(ENVIRONMENT=env_name, FASTAPI_DEBUG="true", HMAC_ENABLED="true")
+    errors = config.validate_settings()
+    assert "FASTAPI_DEBUG" in errors
+    assert "HMAC_ENABLED" not in errors
 
 
 @pytest.mark.parametrize("env_name", ["stage", "prod"])
-def test_debug_false_allowed_in_stage_and_prod(env, env_name):
-    env(FASTAPI_ENV=env_name, FASTAPI_DEBUG="false")
+def test_hmac_required_in_stage_and_prod(env, env_name):
+    env(ENVIRONMENT=env_name, FASTAPI_DEBUG="false", HMAC_ENABLED="false")
+    assert "HMAC_ENABLED" in config.validate_settings()
+
+
+@pytest.mark.parametrize("env_name", ["stage", "prod"])
+def test_secure_config_allowed_in_stage_and_prod(env, env_name):
+    env(ENVIRONMENT=env_name, FASTAPI_DEBUG="false", HMAC_ENABLED="true",  SF_LOGIN_URL="https://login.salesforce.com")
     assert config.validate_settings() == {}
 
 
-def test_debug_allowed_in_development(env):
-    env(FASTAPI_ENV="development", FASTAPI_DEBUG="true")
-    assert config.validate_settings() == {}
+def test_prod_must_not_use_sandbox_login_url(env):
+    env(ENVIRONMENT="prod", FASTAPI_DEBUG="false", HMAC_ENABLED="true",
+        SF_LOGIN_URL="https://test.salesforce.com")
+    assert "SF_LOGIN_URL" in config.validate_settings()
 
+
+def test_debug_and_no_hmac_allowed_in_dev(env):
+    env(ENVIRONMENT="dev", FASTAPI_DEBUG="true", HMAC_ENABLED="false")
+    assert config.validate_settings() == {}
 
 def test_extra_env_vars_are_ignored(env, monkeypatch):
     env()
