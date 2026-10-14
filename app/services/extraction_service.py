@@ -139,8 +139,6 @@ def run_scan_background(bulk_client, scan_store, scan_id: str, minio_client, max
                         progress.minio_path.append(path)
                     scan_store.update(scan)
                 
-                # Delete SF Job
-                bulk_client.delete_job(progress.sf_job_id)
 
                 if clickhouse_client and progress.minio_path:   # empty -> s3() glob would error
                     try:

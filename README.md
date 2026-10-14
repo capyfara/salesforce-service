@@ -60,7 +60,7 @@ For design rationale and Nomad/Vault deployment HCL, see [`salesforce-service-te
 ├── Dockerfile
 ├── docker-compose.yml            
 ├── pytest.ini
-├── requirements.txt
+└── requirements.txt
 
 ```
 

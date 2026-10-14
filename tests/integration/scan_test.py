@@ -132,9 +132,15 @@ def minio_client():
 def core_client():
     return MagicMock()
 
+@pytest.fixture
+def clickhouse_client():
+    client = MagicMock()
+    client.load_object.return_value = 0
+    return client
+
 
 @pytest.fixture
-def app(scan_store, bulk_client, minio_client, core_client):
+def app(scan_store, bulk_client, minio_client, core_client, clickhouse_client):
     app = FastAPI()
     app.include_router(scan.router)
     # HMAC is exercised separately (see HMAC section); bypass it here.
@@ -143,6 +149,7 @@ def app(scan_store, bulk_client, minio_client, core_client):
     app.state.bulk_client = bulk_client
     app.state.minio_client = minio_client
     app.state.core_client = core_client  # start/resume read this from app.state
+    app.state.clickhouse_client = clickhouse_client
     app.state.settings = MagicMock(SF_MAX_JOB_TIMEOUT_HOURS=2, HMAC_ENABLED=False)
     return app
 
@@ -730,22 +737,21 @@ def test_build_soql_incremental_adds_filter():
 # run_scan_background
 # ===========================================================================
 
-def run_bg(bulk_client, scan_store, minio_client, core_client, scan_id="scan-1", timeout=7200):
+def run_bg(bulk_client, scan_store, minio_client, core_client, scan_id="scan-1", timeout=7200, clickhouse_client=None):
     extraction_service.run_scan_background(
-        bulk_client, scan_store, scan_id, minio_client, timeout, core_client
+        bulk_client, scan_store, scan_id, minio_client, timeout, core_client, clickhouse_client
     )
 
 
-def test_background_missing_scan_is_noop(scan_store, bulk_client, minio_client, core_client):
-    run_bg(bulk_client, scan_store, minio_client, core_client, scan_id="ghost")
+def test_background_missing_scan_is_noop(scan_store, bulk_client, minio_client, core_client, ):
+    run_bg(bulk_client, scan_store, minio_client, core_client, scan_id="ghost", )
     bulk_client.poll_until_complete.assert_not_called()
 
 
-def test_background_polls_with_configured_timeout(scan_store, bulk_client, minio_client, core_client):
+def test_background_polls_with_configured_timeout(scan_store, bulk_client, minio_client, core_client, ):
     make_scan(scan_store, progress={"Contact": ObjectProgress(sf_job_id="job-1", state="UploadComplete")})
 
     run_bg(bulk_client, scan_store, minio_client, core_client, timeout=3600)
-
     bulk_client.poll_until_complete.assert_called_once_with("job-1", 3600)
 
 
@@ -758,7 +764,7 @@ def test_background_skips_already_complete_objects(scan_store, bulk_client, mini
     run_bg(bulk_client, scan_store, minio_client, core_client)
 
     polled = [c.args[0] for c in bulk_client.poll_until_complete.call_args_list]
-    assert polled == ["job-todo"]
+    assert polled == ["job-todo",]
     assert scan_store.get("scan-1").status == ScanStatus.COMPLETE
 
 
@@ -895,6 +901,44 @@ def test_background_reports_final_status_to_core_service(
     assert args[0] == "scan-1"
     assert args[2] == 42  # total records
 
+
+def test_background_loads_clickhouse_after_upload(
+    scan_store, bulk_client, minio_client, core_client, clickhouse_client
+):
+    make_scan(scan_store, progress={"Contact": ObjectProgress(sf_job_id="j1", state="UploadComplete")})
+    bulk_client.iter_results.side_effect = lambda *a, **k: iter([[{"Id": "001"}]])
+    clickhouse_client.load_object.return_value = 1
+
+    run_bg(bulk_client, scan_store, minio_client, core_client, clickhouse_client=clickhouse_client)
+    clickhouse_client.load_object.assert_called_once_with("Contact", "org-1", "scan-1")
+    p = scan_store.get("scan-1").progress["Contact"]
+    assert p.clickhouse_loaded is True and p.clickhouse_rows == 1
+
+
+def test_background_skips_clickhouse_when_nothing_uploaded(
+    scan_store, bulk_client, minio_client, core_client, clickhouse_client
+):
+    """iter_results is empty by default, so no files are written and the s3() glob would error."""
+    make_scan(scan_store, progress={"Contact": ObjectProgress(sf_job_id="j1", state="UploadComplete")})
+
+    run_bg(bulk_client, scan_store, minio_client, core_client, clickhouse_client=clickhouse_client)
+
+    clickhouse_client.load_object.assert_not_called()
+
+
+def test_background_clickhouse_failure_is_recorded_not_fatal(
+    scan_store, bulk_client, minio_client, core_client, clickhouse_client
+):
+    make_scan(scan_store, progress={"Contact": ObjectProgress(sf_job_id="j1", state="UploadComplete")})
+    bulk_client.iter_results.side_effect = lambda *a, **k: iter([[{"Id": "001"}]])
+    clickhouse_client.load_object.side_effect = RuntimeError("clickhouse down")
+
+    run_bg(bulk_client, scan_store, minio_client, core_client, clickhouse_client=clickhouse_client)
+
+    p = scan_store.get("scan-1").progress["Contact"]
+    assert p.state == "JobComplete"
+    assert p.clickhouse_loaded is False
+    assert "clickhouse down" in p.clickhouse_error
 
 # ===========================================================================
 # CONCURRENCY: cancel scan vs. background polling
