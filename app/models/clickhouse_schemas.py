@@ -48,6 +48,8 @@ _KINDS: dict[str, tuple[str, str]] = {
 
     # Salesforce booleans arrive as the strings 'true' / 'false'.
     "bool": ("Nullable(Bool)", "if({c} = '', NULL, lower({c}) = 'true')"),
+
+    "created": ("DateTime64(3, 'UTC')", "parseDateTime64BestEffortOrZero({c}, 3, 'UTC')"),
 }
 
 # ---------------------------------------------------------------------------
@@ -73,8 +75,20 @@ FIELD_KINDS: dict[str, str] = {
     "AnnualRevenue": "decimal",      # Account / Lead
 
     "IsActive": "bool",              # User
+    "IsClosed": "bool",              # Case / Task
     "IsConverted": "bool",           # Lead
     "IsDeleted": "bool",
+
+    "ClosedDate": "datetime",        # Case
+    "StartDate": "date",             # Campaign
+    "EndDate": "date",               # Campaign
+    "BudgetedCost": "decimal",       # Campaign
+    "ActualCost": "decimal",         # Campaign
+    "ExpectedRevenue": "decimal",    # Campaign
+    
+    "HasResponded": "bool",          # CampaignMember
+    "IsAllDayEvent": "bool",         # Event
+    "FirstRespondedDate": "datetime", # CampaignMember
 }
 
 # Columns every table must contain: the engine and sort key depend on them.
@@ -95,12 +109,13 @@ class TableSpec:
         """CREATE TABLE statement. Idempotent (IF NOT EXISTS)."""
         cols = ",\n    ".join(f"`{n}` {_KINDS[k][0]}" for n, k in self.columns)
         return f"""
-            CREATE TABLE IF NOT EXISTS {db}.{self.table} (
+                CREATE TABLE IF NOT EXISTS {db}.`{self.table}` (
                 org_id LowCardinality(String),
                 scan_id String,
                 {cols},
                 _ingested_at DateTime DEFAULT now()
             ) ENGINE = ReplacingMergeTree(LastModifiedDate)
+            PARTITION BY toYYYYMM(CreatedDate)
             ORDER BY (org_id, Id)
         """
 
@@ -117,7 +132,7 @@ class TableSpec:
         names = ", ".join(f"`{n}`" for n, _ in self.columns)
         exprs = ", ".join(_KINDS[k][1].format(c=f"`{n}`") for n, k in self.columns)
         return f"""
-            INSERT INTO {db}.{self.table} (org_id, scan_id, {names})
+                INSERT INTO {db}.`{self.table}` (org_id, scan_id, {names})
             SELECT %(org_id)s, %(scan_id)s, {exprs}
             FROM s3(%(url)s, %(access_key)s, %(secret_key)s, 'Parquet')
         """

@@ -24,7 +24,8 @@ services:
       SF_CONSUMER_KEY: ${SF_CONSUMER_KEY}
       SF_PRIVATE_KEY_PEM_PATH: /run/secrets/sf_private_key.pem
       SF_USERNAME: ${SF_USERNAME}
-      SF_LOGIN_URL: https://login.salesforce.com
+      # SF_LOGIN_URL: https://login.salesforce.com
+      SF_LOGIN_URL: http://mock-salesforce:8080
       SF_API_VERSION: v59.0
       SF_BULK_PAGE_SIZE: "50000"
       SF_MAX_JOB_TIMEOUT_HOURS: "2"
@@ -133,7 +134,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
- 
+  
+  mock-salesforce:
+    build: ./mock_salesforce
+    container_name: salesforce-service-mock-dev
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  
 volumes:
   salesforce_dev_pgdata:
   salesforce_dev_miniodata:

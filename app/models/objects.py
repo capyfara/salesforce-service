@@ -75,4 +75,22 @@ SUPPORTED_OBJECTS: list[SupportedObject] = [
                         "OwnerId", "CreatedDate", "LastModifiedDate"],
         supports_incremental=True,
     ),
+    SupportedObject(
+        name="Campaign",
+        label="Campaigns",
+        soql_template="SELECT {fields} FROM Campaign {where_clause} ORDER BY LastModifiedDate ASC",
+        default_fields=["Id", "Name", "Type", "Status", "IsActive", "StartDate", "EndDate",
+                        "BudgetedCost", "ActualCost", "ExpectedRevenue", "ParentId",
+                        "OwnerId", "CreatedDate", "LastModifiedDate"],
+        supports_incremental=True,
+    ),
+    SupportedObject(
+        name="Case",
+        label="Cases",
+        soql_template="SELECT {fields} FROM Case {where_clause} ORDER BY LastModifiedDate ASC",
+        default_fields=["Id", "CaseNumber", "Subject", "Status", "Priority", "Origin", "Type",
+                        "IsClosed", "ClosedDate", "ContactId", "AccountId", "OwnerId",
+                        "CreatedDate", "LastModifiedDate"],
+        supports_incremental=True,
+    ),
 ]

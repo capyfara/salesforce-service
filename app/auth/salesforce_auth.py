@@ -22,6 +22,10 @@ class SalesforceTokenManager:
             if time.time() > (self._expires_at - 300):
                 self._refresh()
         return self._access_token, self._instance_url
+    
+    def invalidate(self):
+        with self._lock:
+            self._expires_at = 0
 
     def _refresh(self):
         now = int(time.time())

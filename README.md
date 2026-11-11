@@ -143,6 +143,7 @@ curl http://localhost:5710/api/health
 
 - Interactive API docs: <http://localhost:5710/docs>
 - MinIO console: <http://localhost:9001> (`minioadmin` / `minioadmin`)
+- Clickhouse console: <http://localhost:8123/play> (`dev_user` / `dev_pass`)
 
 If configuration is missing or invalid, the service logs a `CONFIGURATION VALIDATION FAILED` block (variable, error, fix) and refuses to start.
 
