@@ -10,6 +10,7 @@ from storage.clickhouse_client import ClickHouseClient
 from config import SalesforceServiceSettings, validate_settings
 from auth.salesforce_auth import SalesforceTokenManager
 from storage.scan_store import PostgresScanStore
+from storage.nonce_store import PostgresNonceStore
 from clients.bulk_api_client import SalesforceBulkAPIClient
 from storage.minio_client import MinioStorageClient
 from clients.core_service_client import CoreServiceClient
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI):
         f"options=-csearch_path={settings.DB_SCHEMA}"
     )
     app.state.scan_store = PostgresScanStore(dsn)
+    app.state.nonce_store = PostgresNonceStore(dsn)
     app.state.minio_client = MinioStorageClient(
         endpoint=settings.MINIO_ENDPOINT,
         access_key=settings.MINIO_ACCESS_KEY,

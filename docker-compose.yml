@@ -32,7 +32,7 @@ services:
       MAX_CONCURRENT_SCANS: "2"
       SCAN_TIMEOUT_HOURS: "2"
       CLEANUP_DAYS: "7"
-      HMAC_ENABLED: "false"
+      HMAC_ENABLED: "true"
       HMAC_SECRET_KEY_CORE: dev-core-key
       HMAC_SECRET_KEY_ENGINEER: dev-engineer-key
       HMAC_SIGNATURE_MAX_AGE: "300"

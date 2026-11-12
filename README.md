@@ -218,15 +218,35 @@ CORE_SERVICE_URL=your-core-service-url
 
 ### Authentication
 
-When `HMAC_ENABLED=true`, every endpoint except `/api/health` needs three headers:
+When `HMAC_ENABLED=true`, every endpoint except `/api/health` needs 4 headers:
 
-| Header | Value |
-|---|---|
-| `X-Timestamp` | Unix time in seconds |
-| `X-Signature` | `hex(HMAC-SHA256(secret, f"{timestamp}.{raw_body}"))` |
-| `X-Key-Id` | `core` (default) or `engineer` |
+X-Timestamp: {{x_timestamp}}
+X-Nonce: {{x_nonce}}
+X-Signature: {{x_signature}} (Method and Path is part of the signed string)
+X-Key-Id: core
 
 Sign the body exactly as sent (an empty string for bodyless requests). Signatures older than `HMAC_SIGNATURE_MAX_AGE` are rejected.
+
+Example Postman Script for API Requests:
+```js
+const secret = "dev-core-key";
+const keyId  = "core";
+
+const ts     = (Date.now() / 1000).toString();
+const nonce  = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+const method = pm.request.method.toUpperCase();
+const pathQuery = pm.variables.replaceIn(pm.request.url.getPathWithQuery());
+const raw = pm.request.body && pm.request.body.mode === "raw"
+  ? pm.variables.replaceIn(pm.request.body.raw) : "";
+const bodyHash = CryptoJS.SHA256(raw).toString(CryptoJS.enc.Hex);
+
+const s = ["v1", ts, nonce, keyId, method, pathQuery, bodyHash].join("\n");
+
+pm.request.headers.add({ key: "X-Timestamp", value: ts });
+pm.request.headers.add({ key: "X-Nonce",     value: nonce });
+pm.request.headers.add({ key: "X-Signature", value: CryptoJS.HmacSHA256(s, secret).toString(CryptoJS.enc.Hex) });
+
+```
 
 ```python
 import hashlib, hmac, json, time, requests

@@ -8,10 +8,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post(
-    "/api/maintenance/cleanup",
-    dependencies=[Depends(require_key_id("engineer"))],
-)
+@router.post("/api/maintenance/cleanup", dependencies=[Depends(require_key_id("core"))])
 def cleanup(request: Request, dry_run: bool = Query(default=False)):
     """
     Purge scan records past the retention window (settings.CLEANUP_DAYS)
